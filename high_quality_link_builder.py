@@ -293,7 +293,11 @@ class HighQualityLinkBuilder:
                             "//input[contains(@name, 'captcha') or contains(@id, 'captcha')]")
                         captcha_input.send_keys(captcha_text)
                         return True
-                        
+                
+            return False
+            
+        except Exception as e:
+            self.logger.error(f"Error detecting/handling CAPTCHA: {str(e)}")
             return False
             
     def submit_to_directory(self, url):
