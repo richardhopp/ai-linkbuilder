@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: high-quality-link-builder
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: standard
+    branch: main
+    numInstances: 1
+    healthCheckPath: /
+    envVars:
+      - key: API_KEY
+        generateValue: true
+      - key: PORT
+        value: 8000
