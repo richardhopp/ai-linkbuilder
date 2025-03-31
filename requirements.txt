@@ -1,0 +1,12 @@
+selenium==4.9.1
+beautifulsoup4==4.12.2
+requests==2.30.0
+nltk==3.8.1
+openai==0.27.8
+python-dotenv==1.0.0
+2captcha-python==1.2.0
+pandas==2.0.1
+fastapi==0.95.2
+uvicorn==0.22.0
+python-multipart==0.0.6
+gunicorn==21.2.0
