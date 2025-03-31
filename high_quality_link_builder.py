@@ -801,24 +801,21 @@ if __name__ == "__main__":
         # Run the campaign
         results = link_builder.run_campaign(sites_per_type=3)
         print(f"Campaign Results: {results}")
-        
+    except Exception as e:
+        link_builder.logger.error(f"Error detecting/handling CAPTCHA: {str(e)}")
     finally:
         link_builder.cleanup()
-            
-        except Exception as e:
-            self.logger.error(f"Error detecting/handling CAPTCHA: {str(e)}")
-            return False
-            
-    def check_site_quality(self, domain, url=None):
-        """
-        Check site quality using Ahrefs API v3.
-        Returns True if the site meets quality criteria, False otherwise.
-        """
-        if not self.config["ahrefs_api_key"]:
-            self.logger.warning("No Ahrefs API key provided. Skipping quality check.")
-            return True
-            
-        # Remove www. if present
+
+def check_site_quality(self, domain, url=None):
+    """
+    Check site quality using Ahrefs API v3.
+    Returns True if the site meets quality criteria, False otherwise.
+    """
+    if not self.config["ahrefs_api_key"]:
+        self.logger.warning("No Ahrefs API key provided. Skipping quality check.")
+        return True
+    
+    # Remove www. if present
         clean_domain = domain.replace("www.", "")
         
         # Exclude subdomains if configured
