@@ -12,3 +12,4 @@ services:
         generateValue: true
       - key: PORT
         value: 8000
+    startCommand: python3 app.py  # Add this line
