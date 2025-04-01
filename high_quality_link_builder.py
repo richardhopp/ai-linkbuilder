@@ -1163,591 +1163,591 @@ def submit_to_site(self, url, site_type):
             self.close_driver()
             
 def extract_page_context(self, url, site_type):
-        """
-        Extract context from a page for content generation.
-        Returns a tuple of (context_text, question, topic)
-        """
-        try:
-            driver = self.get_driver()
-            driver.get(url)
+    """
+    Extract context from a page for content generation.
+    Returns a tuple of (context_text, question, topic)
+    """
+    try:
+        driver = self.get_driver()
+        driver.get(url)
+        
+        # Extract visible text from the page
+        page_text = driver.find_element(By.TAG_NAME, "body").text
+        
+        # Limit to reasonable size
+        if page_text and len(page_text) > 5000:
+            page_text = page_text[:5000]
             
-            # Extract visible text from the page
-            page_text = driver.find_element(By.TAG_NAME, "body").text
+        # For QA sites, try to extract the question
+        question = None
+        if site_type == "qa_sites":
+            # Look for common question containers
+            question_elements = driver.find_elements(By.CSS_SELECTOR, 
+                ".question-title, .question-header, h1.title, .post-title")
             
-            # Limit to reasonable size
-            if page_text and len(page_text) > 5000:
-                page_text = page_text[:5000]
+            if question_elements:
+                question = question_elements[0].text
                 
-            # For QA sites, try to extract the question
-            question = None
-            if site_type == "qa_sites":
-                # Look for common question containers
-                question_elements = driver.find_elements(By.CSS_SELECTOR, 
-                    ".question-title, .question-header, h1.title, .post-title")
-                
-                if question_elements:
-                    question = question_elements[0].text
-                    
-            # Extract main topic based on page content
-            topic = self.extract_page_topic(page_text)
-            
-            return page_text, question, topic
-            
-        except Exception as e:
-            self.logger.error(f"Error extracting context from {url}: {str(e)}")
-            return None, None, None
-            
-    def extract_page_topic(self, context_text):
-        """Extract the main topic from page content."""
-        if not context_text:
-            return None
-            
-        try:
-            # Tokenize and remove stopwords
-            tokens = [w.lower() for w in word_tokenize(context_text) if w.isalpha()]
-            filtered_tokens = [w for w in tokens if w not in self.stopwords and len(w) > 3]
-            
-            # Count word frequencies
-            freq_dist = nltk.FreqDist(filtered_tokens)
-            top_words = [word for word, freq in freq_dist.most_common(5)]
-            
-            return " ".join(top_words)
-            
-        except Exception as e:
-            self.logger.error(f"Error extracting page topic: {str(e)}")
-            return None
-            
+        # Extract main topic based on page content
+        topic = self.extract_page_topic(page_text)
+        
+        return page_text, question, topic
+        
+    except Exception as e:
+        self.logger.error(f"Error extracting context from {url}: {str(e)}")
+        return None, None, None
+        
+def extract_page_topic(self, context_text):
+    """Extract the main topic from page content."""
+    if not context_text:
+        return None
+        
+    try:
+        # Tokenize and remove stopwords
+        tokens = [w.lower() for w in word_tokenize(context_text) if w.isalpha()]
+        filtered_tokens = [w for w in tokens if w not in self.stopwords and len(w) > 3]
+        
+        # Count word frequencies
+        freq_dist = nltk.FreqDist(filtered_tokens)
+        top_words = [word for word, freq in freq_dist.most_common(5)]
+        
+        return " ".join(top_words)
+        
+    except Exception as e:
+        self.logger.error(f"Error extracting page topic: {str(e)}")
+        return None
+        
 def generate_random_string(self, length=6):
-        """Generate a random string of specified length."""
-        return ''.join(random.choices(string.ascii_lowercase + string.digits, k=length))
-            
+    """Generate a random string of specified length."""
+    return ''.join(random.choices(string.ascii_lowercase + string.digits, k=length))
+        
 def generate_smart_content(self, site_type, target_url, context_text=None, question=None, topic=None):
-        """
-        Generate relevant content based on target site type and available context.
-        Returns tuple of (content, relevant_site)
-        """
-        try:
-            # Extract domain and page topic
-            domain = urlparse(target_url).netloc
-            page_topic = topic if topic else self.extract_page_topic(context_text)
-            
-            # Select relevant money sites based on topic relevance
-            relevant_site = self.select_relevant_site(page_topic)
-            
-            # Determine number of links to include
-            links_count = random.randint(
-                self.config["smart_linking"]["links_per_post"]["min"],
-                self.config["smart_linking"]["links_per_post"]["max"]
-            )
-            
-            # Generate content based on site type
-            if hasattr(self, 'openai_client'):
-                return self.generate_ai_content(site_type, domain, page_topic, question, context_text, relevant_site, links_count)
-            else:
-                return self.generate_template_content(site_type, page_topic, question, relevant_site, links_count)
-                
-        except Exception as e:
-            self.logger.error(f"Error generating smart content: {str(e)}")
-            return self.generate_fallback_content(site_type, relevant_site)
-            
-def select_relevant_site(self, topic):
-        """
-        Select the most relevant money site based on topic.
-        Returns dict with site information.
-        """
-        if not topic:
-            # If no topic, select a random site
-            site_name = random.choice(list(self.sites_data.keys()))
-            return {"name": site_name, **self.sites_data[site_name]}
-            
-        # Calculate relevance scores for each site
-        scores = {}
-        topic_tokens = set(topic.lower().split()) if topic else set()
+    """
+    Generate relevant content based on target site type and available context.
+    Returns tuple of (content, relevant_site)
+    """
+    try:
+        # Extract domain and page topic
+        domain = urlparse(target_url).netloc
+        page_topic = topic if topic else self.extract_page_topic(context_text)
         
-        for site_name, site_info in self.sites_data.items():
-            # Score based on keyword overlap
-            keywords = set([k.lower() for k in site_info["keywords"]])
-            keyword_overlap = len(topic_tokens.intersection(keywords)) if topic_tokens else 0
-            
-            # Add random factor to avoid always picking the same site for similar topics
-            random_boost = random.uniform(0, 0.5)
-            scores[site_name] = keyword_overlap + random_boost
-            
-        # Get site with highest score
-        if scores:
-            best_site_name = max(scores, key=scores.get)
-            return {"name": best_site_name, **self.sites_data[best_site_name]}
+        # Select relevant money sites based on topic relevance
+        relevant_site = self.select_relevant_site(page_topic)
+        
+        # Determine number of links to include
+        links_count = random.randint(
+            self.config["smart_linking"]["links_per_post"]["min"],
+            self.config["smart_linking"]["links_per_post"]["max"]
+        )
+        
+        # Generate content based on site type
+        if hasattr(self, 'openai_client'):
+            return self.generate_ai_content(site_type, domain, page_topic, question, context_text, relevant_site, links_count)
         else:
-            # Fallback to random selection
-            site_name = random.choice(list(self.sites_data.keys()))
-            return {"name": site_name, **self.sites_data[site_name]}
+            return self.generate_template_content(site_type, page_topic, question, relevant_site, links_count)
             
+    except Exception as e:
+        self.logger.error(f"Error generating smart content: {str(e)}")
+        return self.generate_fallback_content(site_type, relevant_site)
+        
+def select_relevant_site(self, topic):
+    """
+    Select the most relevant money site based on topic.
+    Returns dict with site information.
+    """
+    if not topic:
+        # If no topic, select a random site
+        site_name = random.choice(list(self.sites_data.keys()))
+        return {"name": site_name, **self.sites_data[site_name]}
+        
+    # Calculate relevance scores for each site
+    scores = {}
+    topic_tokens = set(topic.lower().split()) if topic else set()
+    
+    for site_name, site_info in self.sites_data.items():
+        # Score based on keyword overlap
+        keywords = set([k.lower() for k in site_info["keywords"]])
+        keyword_overlap = len(topic_tokens.intersection(keywords)) if topic_tokens else 0
+        
+        # Add random factor to avoid always picking the same site for similar topics
+        random_boost = random.uniform(0, 0.5)
+        scores[site_name] = keyword_overlap + random_boost
+        
+    # Get site with highest score
+    if scores:
+        best_site_name = max(scores, key=scores.get)
+        return {"name": best_site_name, **self.sites_data[best_site_name]}
+    else:
+        # Fallback to random selection
+        site_name = random.choice(list(self.sites_data.keys()))
+        return {"name": site_name, **self.sites_data[site_name]}
+        
 def generate_ai_content(self, site_type, domain, page_topic, question, context_text, site_info, links_count):
-        """Generate content using OpenAI."""
-        try:
-            prompt_content = ""
+    """Generate content using OpenAI."""
+    try:
+        prompt_content = ""
+        
+        if site_type == "forums":
+            prompt_content = f"""Write a helpful, informative forum post about {page_topic if page_topic else 'living abroad or real estate investment'}. 
+            The forum is on {domain}. Make it sound natural and conversational, not promotional.
+            Incorporate {links_count} natural reference(s) to {site_info['url']} which specializes in {site_info['description']}
+            Do not use obvious promotional language. Make the link relevant to the discussion.
+            Response should be 3-4 paragraphs and include a question at the end to encourage replies."""
             
-            if site_type == "forums":
-                prompt_content = f"""Write a helpful, informative forum post about {page_topic if page_topic else 'living abroad or real estate investment'}. 
-                The forum is on {domain}. Make it sound natural and conversational, not promotional.
-                Incorporate {links_count} natural reference(s) to {site_info['url']} which specializes in {site_info['description']}
-                Do not use obvious promotional language. Make the link relevant to the discussion.
-                Response should be 3-4 paragraphs and include a question at the end to encourage replies."""
-                
-            elif site_type == "blogs":
-                prompt_content = f"""Write a thoughtful blog comment about {page_topic if page_topic else 'property investment or living abroad'}. 
-                The blog is on {domain}. Be insightful and add value to the article.
-                Naturally incorporate {links_count} reference(s) to {site_info['url']} which offers {site_info['description']}
-                Avoid obvious promotional language. Make the links feel helpful in context.
-                Response should be 2-3 paragraphs, conversational but intelligent."""
-                
-            elif site_type == "qa_sites":
-                if question:
-                    prompt_content = f"""Write a detailed, helpful answer to the question: "{question}" 
-                    The Q&A site is {domain}. Be informative and thorough.
-                    Naturally incorporate {links_count} reference(s) to {site_info['url']} which provides {site_info['description']}
-                    Make the link(s) genuinely helpful to someone with this question. Avoid promotional language.
-                    Response should be comprehensive yet concise, about 3-4 paragraphs."""
-                else:
-                    prompt_content = f"""Write a detailed answer about {page_topic if page_topic else 'real estate investment or living abroad'}. 
-                    The Q&A site is {domain}. Be informative and thorough.
-                    Naturally incorporate {links_count} reference(s) to {site_info['url']} which provides {site_info['description']}
-                    Make the link(s) genuinely helpful. Avoid promotional language.
-                    Response should be comprehensive yet concise, about 3-4 paragraphs."""
-                    
-            elif site_type == "comment_sections":
-                prompt_content = f"""Write an insightful comment for an article about {page_topic if page_topic else 'property or travel'}. 
-                The website is {domain}. Be thoughtful and add to the discussion.
-                Subtly incorporate {links_count} reference(s) to {site_info['url']} which focuses on {site_info['description']}
-                Make the comment primarily valuable, with the link appearing natural and helpful.
-                Response should be 2 paragraphs, intelligent but conversational."""
-                
-            else:  # Default for other site types
-                prompt_content = f"""Write helpful content about {page_topic if page_topic else 'real estate investment or living abroad'} for {domain}.
-                Naturally incorporate {links_count} reference(s) to {site_info['url']} which specializes in {site_info['description']}
-                Avoid obvious promotional language. Make the content helpful and the links contextually relevant.
-                Response should be 2-3 paragraphs, informative and well-written."""
-                
-            # Add context if available
-            if context_text:
-                context_sample = context_text[:500] + "..." if len(context_text) > 500 else context_text
-                prompt_content += f"\n\nContext from the page: \"{context_sample}\""
-                
-            # Generate content with OpenAI - updated for new client
-            response = self.openai_client.chat.completions.create(
-                model="gpt-4",
-                messages=[
-                    {"role": "system", "content": "You are an expert in real estate, travel, and expatriate living. Write helpful, natural-sounding content that subtly incorporates links without appearing promotional. The links should feel like genuine resources rather than advertisements."},
-                    {"role": "user", "content": prompt_content}
-                ],
-                temperature=0.7,
-                max_tokens=1000
-            )
+        elif site_type == "blogs":
+            prompt_content = f"""Write a thoughtful blog comment about {page_topic if page_topic else 'property investment or living abroad'}. 
+            The blog is on {domain}. Be insightful and add value to the article.
+            Naturally incorporate {links_count} reference(s) to {site_info['url']} which offers {site_info['description']}
+            Avoid obvious promotional language. Make the links feel helpful in context.
+            Response should be 2-3 paragraphs, conversational but intelligent."""
             
-            content = response.choices[0].message.content.strip()
-            
-            # Add HTML link if not already included
-            if site_info["url"] not in content:
-                # Generate anchor text variations
-                anchor_options = [
-                    site_info["name"],
-                    "this resource",
-                    "this helpful site",
-                    "this guide",
-                    "more information here",
-                    random.choice(site_info["keywords"])
-                ]
+        elif site_type == "qa_sites":
+            if question:
+                prompt_content = f"""Write a detailed, helpful answer to the question: "{question}" 
+                The Q&A site is {domain}. Be informative and thorough.
+                Naturally incorporate {links_count} reference(s) to {site_info['url']} which provides {site_info['description']}
+                Make the link(s) genuinely helpful to someone with this question. Avoid promotional language.
+                Response should be comprehensive yet concise, about 3-4 paragraphs."""
+            else:
+                prompt_content = f"""Write a detailed answer about {page_topic if page_topic else 'real estate investment or living abroad'}. 
+                The Q&A site is {domain}. Be informative and thorough.
+                Naturally incorporate {links_count} reference(s) to {site_info['url']} which provides {site_info['description']}
+                Make the link(s) genuinely helpful. Avoid promotional language.
+                Response should be comprehensive yet concise, about 3-4 paragraphs."""
                 
-                anchor_text = random.choice(anchor_options)
-                html_link = f'<a href="{site_info["url"]}">{anchor_text}</a>'
+        elif site_type == "comment_sections":
+            prompt_content = f"""Write an insightful comment for an article about {page_topic if page_topic else 'property or travel'}. 
+            The website is {domain}. Be thoughtful and add to the discussion.
+            Subtly incorporate {links_count} reference(s) to {site_info['url']} which focuses on {site_info['description']}
+            Make the comment primarily valuable, with the link appearing natural and helpful.
+            Response should be 2 paragraphs, intelligent but conversational."""
+            
+        else:  # Default for other site types
+            prompt_content = f"""Write helpful content about {page_topic if page_topic else 'real estate investment or living abroad'} for {domain}.
+            Naturally incorporate {links_count} reference(s) to {site_info['url']} which specializes in {site_info['description']}
+            Avoid obvious promotional language. Make the content helpful and the links contextually relevant.
+            Response should be 2-3 paragraphs, informative and well-written."""
+            
+        # Add context if available
+        if context_text:
+            context_sample = context_text[:500] + "..." if len(context_text) > 500 else context_text
+            prompt_content += f"\n\nContext from the page: \"{context_sample}\""
+            
+        # Generate content with OpenAI - updated for new client
+        response = self.openai_client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "You are an expert in real estate, travel, and expatriate living. Write helpful, natural-sounding content that subtly incorporates links without appearing promotional. The links should feel like genuine resources rather than advertisements."},
+                {"role": "user", "content": prompt_content}
+            ],
+            temperature=0.7,
+            max_tokens=1000
+        )
+        
+        content = response.choices[0].message.content.strip()
+        
+        # Add HTML link if not already included
+        if site_info["url"] not in content:
+            # Generate anchor text variations
+            anchor_options = [
+                site_info["name"],
+                "this resource",
+                "this helpful site",
+                "this guide",
+                "more information here",
+                random.choice(site_info["keywords"])
+            ]
+            
+            anchor_text = random.choice(anchor_options)
+            html_link = f'<a href="{site_info["url"]}">{anchor_text}</a>'
+            
+            # Insert link at a natural position
+            sentences = sent_tokenize(content)
+            if len(sentences) > 2:
+                insert_position = random.randint(1, len(sentences) - 2)
+                sentences[insert_position] = sentences[insert_position].replace(
+                    anchor_text, html_link) if anchor_text in sentences[insert_position] else \
+                    sentences[insert_position] + f" You can find {html_link} for more details."
+                content = " ".join(sentences)
+            else:
+                content += f" For more information, check out {html_link}."
                 
-                # Insert link at a natural position
-                sentences = sent_tokenize(content)
-                if len(sentences) > 2:
-                    insert_position = random.randint(1, len(sentences) - 2)
-                    sentences[insert_position] = sentences[insert_position].replace(
-                        anchor_text, html_link) if anchor_text in sentences[insert_position] else \
-                        sentences[insert_position] + f" You can find {html_link} for more details."
-                    content = " ".join(sentences)
-                else:
-                    content += f" For more information, check out {html_link}."
-                    
-            return content, site_info
-            
-        except Exception as e:
-            self.logger.error(f"Error generating AI content: {str(e)}")
-            return self.generate_fallback_content(site_type, site_info)
-            
+        return content, site_info
+        
+    except Exception as e:
+        self.logger.error(f"Error generating AI content: {str(e)}")
+        return self.generate_fallback_content(site_type, site_info)
+        
 def generate_template_content(self, site_type, page_topic, question, site_info, links_count):
-        """Generate content from templates when AI generation is unavailable."""
-        try:
-            templates = {
-                "forums": [
-                    "I've been researching {topic} extensively lately. One aspect that really stood out to me was how {site_desc}. I found {site_url} to be particularly helpful for understanding this better. Has anyone else had experience with this? What were your findings?",
-                    "Recently moved abroad and been dealing with {topic}. It's been quite the journey! For anyone interested, {site_url} has some really useful information about {site_keywords}. What's everyone else's experience been like?",
-                    "Question for the community about {topic} - has anyone found good resources for this? After some research, I came across {site_url} which covers {site_desc} in detail. Curious if others have recommendations too?"
-                ],
-                "blogs": [
-                    "Really enjoyed this post about {topic}! It reminds me of some research I was doing recently. For anyone interested in going deeper on this subject, {site_url} has some complementary information about {site_keywords}. Thanks for sharing your insights!",
-                    "Great article! I've been dealing with {topic} myself recently. Found that {site_url} offers some practical advice on {site_desc} that complements what you've written here. Looking forward to more content like this!",
-                    "This is exactly what I needed to read today. I've been working on {topic} and found the information at {site_url} about {site_keywords} to be really helpful alongside your insights. Thanks for putting this together!"
-                ],
-                "qa_sites": [
-                    "Based on my experience with {topic}, there are several approaches you could take. First, consider how {site_desc}. You can find more detailed guidance at {site_url} which covers this extensively. Hope this helps!",
-                    "To answer your question about {question_text}: The key thing to understand is how {site_desc}. There's a comprehensive guide at {site_url} that I found really clarified the process. Let me know if you need any clarification!",
-                    "Having dealt with {topic} myself, I'd recommend first looking into how {site_keywords} work together. {site_url} has some excellent resources that walk through this step by step. The main things to keep in mind are..."
-                ],
-                "comment_sections": [
-                    "This article raises some interesting points about {topic}. From my experience, understanding {site_desc} can add valuable context. I found some helpful insights on this at {site_url}. Thanks for starting this discussion!",
-                    "Really appreciate this perspective on {topic}. It connects well with some research I was reading about {site_keywords} recently. For anyone interested in exploring this further, {site_url} offers some complementary information.",
-                    "Fascinating read! I've been following developments in {topic} for a while. The relationship between this and {site_desc} is particularly interesting. There's some good analysis of this connection at {site_url}."
-                ],
-                "default": [
-                    "I've found {topic} to be increasingly important lately. Understanding how {site_desc} can make a significant difference. {site_url} offers some valuable resources on this that I've found helpful.",
-                    "When dealing with {topic}, it's worth considering how {site_keywords} factor into the equation. There's a helpful overview at {site_url} that covers {site_desc} in detail.",
-                    "For anyone interested in {topic}, I would recommend exploring how {site_desc}. You can find more information at {site_url} which I've found to be a reliable resource."
-                ]
-            }
+    """Generate content from templates when AI generation is unavailable."""
+    try:
+        templates = {
+            "forums": [
+                "I've been researching {topic} extensively lately. One aspect that really stood out to me was how {site_desc}. I found {site_url} to be particularly helpful for understanding this better. Has anyone else had experience with this? What were your findings?",
+                "Recently moved abroad and been dealing with {topic}. It's been quite the journey! For anyone interested, {site_url} has some really useful information about {site_keywords}. What's everyone else's experience been like?",
+                "Question for the community about {topic} - has anyone found good resources for this? After some research, I came across {site_url} which covers {site_desc} in detail. Curious if others have recommendations too?"
+            ],
+            "blogs": [
+                "Really enjoyed this post about {topic}! It reminds me of some research I was doing recently. For anyone interested in going deeper on this subject, {site_url} has some complementary information about {site_keywords}. Thanks for sharing your insights!",
+                "Great article! I've been dealing with {topic} myself recently. Found that {site_url} offers some practical advice on {site_desc} that complements what you've written here. Looking forward to more content like this!",
+                "This is exactly what I needed to read today. I've been working on {topic} and found the information at {site_url} about {site_keywords} to be really helpful alongside your insights. Thanks for putting this together!"
+            ],
+            "qa_sites": [
+                "Based on my experience with {topic}, there are several approaches you could take. First, consider how {site_desc}. You can find more detailed guidance at {site_url} which covers this extensively. Hope this helps!",
+                "To answer your question about {question_text}: The key thing to understand is how {site_desc}. There's a comprehensive guide at {site_url} that I found really clarified the process. Let me know if you need any clarification!",
+                "Having dealt with {topic} myself, I'd recommend first looking into how {site_keywords} work together. {site_url} has some excellent resources that walk through this step by step. The main things to keep in mind are..."
+            ],
+            "comment_sections": [
+                "This article raises some interesting points about {topic}. From my experience, understanding {site_desc} can add valuable context. I found some helpful insights on this at {site_url}. Thanks for starting this discussion!",
+                "Really appreciate this perspective on {topic}. It connects well with some research I was reading about {site_keywords} recently. For anyone interested in exploring this further, {site_url} offers some complementary information.",
+                "Fascinating read! I've been following developments in {topic} for a while. The relationship between this and {site_desc} is particularly interesting. There's some good analysis of this connection at {site_url}."
+            ],
+            "default": [
+                "I've found {topic} to be increasingly important lately. Understanding how {site_desc} can make a significant difference. {site_url} offers some valuable resources on this that I've found helpful.",
+                "When dealing with {topic}, it's worth considering how {site_keywords} factor into the equation. There's a helpful overview at {site_url} that covers {site_desc} in detail.",
+                "For anyone interested in {topic}, I would recommend exploring how {site_desc}. You can find more information at {site_url} which I've found to be a reliable resource."
+            ]
+        }
+        
+        template_list = templates.get(site_type, templates["default"])
+        template = random.choice(template_list)
+        
+        # Fill in template
+        site_keywords = ", ".join(random.sample(site_info["keywords"], min(3, len(site_info["keywords"]))))
+        content = template.format(
+            topic=page_topic if page_topic else "real estate investment and living abroad",
+            site_url=site_info["url"],
+            site_desc=site_info["description"],
+            site_keywords=site_keywords,
+            question_text=question if question else "this topic"
+        )
+        
+        # For better presentation, wrap in HTML paragraph tags if needed
+        if "<p>" not in content:
+            content = "<p>" + content.replace("\n\n", "</p><p>") + "</p>"
             
-            template_list = templates.get(site_type, templates["default"])
-            template = random.choice(template_list)
-            
-            # Fill in template
-            site_keywords = ", ".join(random.sample(site_info["keywords"], min(3, len(site_info["keywords"]))))
-            content = template.format(
-                topic=page_topic if page_topic else "real estate investment and living abroad",
-                site_url=site_info["url"],
-                site_desc=site_info["description"],
-                site_keywords=site_keywords,
-                question_text=question if question else "this topic"
-            )
-            
-            # For better presentation, wrap in HTML paragraph tags if needed
-            if "<p>" not in content:
-                content = "<p>" + content.replace("\n\n", "</p><p>") + "</p>"
-                
-            return content, site_info
-            
-        except Exception as e:
-            self.logger.error(f"Error generating template content: {str(e)}")
-            return self.generate_fallback_content(site_type, site_info)
-            
+        return content, site_info
+        
+    except Exception as e:
+        self.logger.error(f"Error generating template content: {str(e)}")
+        return self.generate_fallback_content(site_type, site_info)
+        
 def generate_fallback_content(self, site_type, site_info):
-        """Generate fallback content when smart content generation fails."""
-        try:
-            templates = {
-                "forums": f"I've been researching real estate options for living abroad. {site_info['name']} at {site_info['url']} has some useful information about this. Anyone have experience with similar services?",
-                "blogs": f"Interesting post! It reminds me of some research I was doing on {site_info['keywords'][0]}. {site_info['name']} ({site_info['url']}) has some complementary information about this topic.",
-                "qa_sites": f"Based on my experience, I would recommend checking out {site_info['name']} ({site_info['url']}), which specializes in {site_info['keywords'][0]} and {site_info['keywords'][1]}. Hope this helps!",
-                "directories": f"{site_info['name']}\n{site_info['url']}\n{site_info['description']}",
-                "wiki_sites": f"{site_info['keywords'][0]} is an important topic in this field. For more information, you might want to check out {site_info['name']} ({site_info['url']}).",
-                "social_bookmarks": f"{site_info['name']}: {site_info['description']} {site_info['url']}",
-                "comment_sections": f"Great article! For related information about {site_info['keywords'][0]}, you might want to check out {site_info['name']} at {site_info['url']}."
-            }
-            
-            content = templates.get(site_type, templates["comment_sections"])
-            
-            # Wrap in HTML if needed
-            if "<p>" not in content and "<a" not in content:
-                content = f'<p>{content}</p>'
-                # Add HTML link if not already present
-                if site_info["url"] in content and f'<a href="{site_info["url"]}"' not in content:
-                    content = content.replace(
-                        site_info["url"], 
-                        f'<a href="{site_info["url"]}">{site_info["url"]}</a>'
-                    )
-                    
-            return content, site_info
-            
-        except Exception as e:
-            self.logger.error(f"Error generating fallback content: {str(e)}")
-            # Ultra fallback
-            return f"Check out <a href=\"{site_info['url']}\">{site_info['name']}</a> for more information.", site_info
-            
+    """Generate fallback content when smart content generation fails."""
+    try:
+        templates = {
+            "forums": f"I've been researching real estate options for living abroad. {site_info['name']} at {site_info['url']} has some useful information about this. Anyone have experience with similar services?",
+            "blogs": f"Interesting post! It reminds me of some research I was doing on {site_info['keywords'][0]}. {site_info['name']} ({site_info['url']}) has some complementary information about this topic.",
+            "qa_sites": f"Based on my experience, I would recommend checking out {site_info['name']} ({site_info['url']}), which specializes in {site_info['keywords'][0]} and {site_info['keywords'][1]}. Hope this helps!",
+            "directories": f"{site_info['name']}\n{site_info['url']}\n{site_info['description']}",
+            "wiki_sites": f"{site_info['keywords'][0]} is an important topic in this field. For more information, you might want to check out {site_info['name']} ({site_info['url']}).",
+            "social_bookmarks": f"{site_info['name']}: {site_info['description']} {site_info['url']}",
+            "comment_sections": f"Great article! For related information about {site_info['keywords'][0]}, you might want to check out {site_info['name']} at {site_info['url']}."
+        }
+        
+        content = templates.get(site_type, templates["comment_sections"])
+        
+        # Wrap in HTML if needed
+        if "<p>" not in content and "<a" not in content:
+            content = f'<p>{content}</p>'
+            # Add HTML link if not already present
+            if site_info["url"] in content and f'<a href="{site_info["url"]}"' not in content:
+                content = content.replace(
+                    site_info["url"], 
+                    f'<a href="{site_info["url"]}">{site_info["url"]}</a>'
+                )
+                
+        return content, site_info
+        
+    except Exception as e:
+        self.logger.error(f"Error generating fallback content: {str(e)}")
+        # Ultra fallback
+        return f"Check out <a href=\"{site_info['url']}\">{site_info['name']}</a> for more information.", site_info
+        
 def run_campaign(self, sites_per_type=5):
-        """Run a full link building campaign."""
-        start_time = time.time()
-        self.logger.info("Starting high-quality link building campaign")
-        
-        # Load sites data from the dictionary we initialized
-        if not self.sites_data:
-            self.logger.error("No sites data found. Aborting campaign.")
-            return {
-                "quality_sites_found": 0,
-                "submissions_attempted": 0,
-                "successful_submissions": 0,
-                "failed_submissions": 0,
-                "error": "No sites data found"
-            }
-            
-        # Track overall statistics
-        total_quality_sites_found = 0
-        total_submissions_attempted = 0
-        
-        results_by_site_type = {}
-        
-        try:
-            for site_type in self.config["target_site_types"]:
-                self.logger.info(f"Finding {site_type} sites...")
-                
-                try:
-                    sites = self.find_submission_sites(site_type, sites_per_type)
-                    
-                    site_type_results = {
-                        "sites_found": len(sites),
-                        "successful_submissions": 0,
-                        "failed_submissions": 0
-                    }
-                    
-                    total_quality_sites_found += len(sites)
-                    self.logger.info(f"Found {len(sites)} quality {site_type} sites meeting criteria")
-                    
-                    if sites:
-                        self.logger.info(f"Attempting submissions to {len(sites)} {site_type} sites...")
-                        
-                        # Save initial counts
-                        initial_successful = self.successful_submissions
-                        initial_failed = self.failed_submissions
-                        
-                        # Use ThreadPoolExecutor for parallel submissions if configured
-                        if self.config["max_threads"] > 1:
-                            with ThreadPoolExecutor(max_workers=min(self.config["max_threads"], len(sites))) as executor:
-                                results = list(executor.map(lambda url: self.submit_to_site(url, site_type), sites))
-                                total_submissions_attempted += len(results)
-                        else:
-                            # Sequential processing
-                            for url in sites:
-                                self.submit_to_site(url, site_type)
-                                total_submissions_attempted += 1
-                                
-                        # Calculate site-type specific stats
-                        site_type_results["successful_submissions"] = self.successful_submissions - initial_successful
-                        site_type_results["failed_submissions"] = self.failed_submissions - initial_failed
-                        
-                    results_by_site_type[site_type] = site_type_results
-                    
-                except Exception as e:
-                    self.logger.error(f"Error processing site type {site_type}: {str(e)}")
-                    traceback.print_exc()  # Print full traceback for debugging
-                    results_by_site_type[site_type] = {
-                        "sites_found": 0,
-                        "successful_submissions": 0,
-                        "failed_submissions": 0,
-                        "error": str(e)
-                    }
-                    
-            # Calculate campaign duration
-            end_time = time.time()
-            duration_seconds = int(end_time - start_time)
-            
-            # Log final statistics
-            self.logger.info(f"Campaign completed in {duration_seconds} seconds.")
-            self.logger.info(f"Quality sites found: {total_quality_sites_found}")
-            self.logger.info(f"Submissions attempted: {total_submissions_attempted}")
-            self.logger.info(f"Successful submissions: {self.successful_submissions}")
-            self.logger.info(f"Failed submissions: {self.failed_submissions}")
-            
-            # Return campaign results
-            return {
-                "quality_sites_found": total_quality_sites_found,
-                "submissions_attempted": total_submissions_attempted,
-                "successful_submissions": self.successful_submissions,
-                "failed_submissions": self.failed_submissions,
-                "duration_seconds": duration_seconds,
-                "results_by_site_type": results_by_site_type
-            }
-            
-        except Exception as e:
-            self.logger.error(f"Error running campaign: {str(e)}")
-            traceback.print_exc()
-            return {
-                "quality_sites_found": total_quality_sites_found,
-                "submissions_attempted": total_submissions_attempted,
-                "successful_submissions": self.successful_submissions,
-                "failed_submissions": self.failed_submissions,
-                "error": str(e)
-            }
-        finally:
-            # Clean up all drivers
-            self.cleanup()
-            
-def find_submission_sites(self, site_type, limit=5):
-        """
-        Find sites for submission based on type and quality criteria.
-        Uses Ahrefs API to find quality sites.
-        """
-        try:
-            self.logger.info(f"Searching for {site_type} sites...")
-            
-            # Define search patterns for different site types
-            search_patterns = {
-                "forums": ["forum", "community", "discussion", "board"],
-                "blogs": ["blog", "article", "post", "news"],
-                "qa_sites": ["questions", "answers", "ask", "q&a"],
-                "directories": ["directory", "list", "catalog", "resources"],
-                "social_bookmarks": ["bookmark", "save", "share", "social"],
-                "wiki_sites": ["wiki", "knowledge", "information", "encyclopedia"],
-                "comment_sections": ["comment", "feedback", "review", "opinion"]
-            }
-            
-            patterns = search_patterns.get(site_type, ["forum", "blog", "questions"])
-            
-            # If we have an Ahrefs API key, use it to find sites
-            if self.config.get("ahrefs_api_key"):
-                # This would be replaced with actual Ahrefs API calls
-                # For now, use mock data
-                found_sites = []
-                
-                for pattern in patterns:
-                    # Mock API call
-                    domain_rating_min = self.config.get("min_domain_rating", 50)
-                    traffic_min = self.config.get("min_organic_traffic", 500)
-                    
-                    # In a real implementation, call Ahrefs API here
-                    
-                    # For testing purposes, generate some mock sites
-                    mock_sites = [
-                        f"https://{pattern}{i}.example.com" for i in range(1, limit + 1)
-                    ]
-                    
-                    for site in mock_sites:
-                        # Check if site meets quality criteria
-                        domain = urlparse(site).netloc
-                        if self.check_site_quality(domain, site):
-                            found_sites.append(site)
-                            if len(found_sites) >= limit:
-                                break
-                
-                self.logger.info(f"Found {len(found_sites)} quality {site_type} sites")
-                return found_sites[:limit]
-            else:
-                # If no Ahrefs API key, use mock data for testing
-                domains = [f"{pattern}{i}.example.com" for pattern in patterns for i in range(1, 3)]
-                sites = [f"https://{domain}/page" for domain in domains]
-                self.logger.info(f"Using {len(sites)} mock {site_type} sites for testing (no Ahrefs API key)")
-                return sites[:limit]
-                
-        except Exception as e:
-            self.logger.error(f"Error finding {site_type} sites: {str(e)}")
-            # Return empty list on error
-            return []
-            
-def check_site_quality(self, domain, url=None):
-        """
-        Check site quality using Ahrefs API v3.
-        Returns True if the site meets quality criteria, False otherwise.
-        """
-        if not self.config.get("ahrefs_api_key"):
-            self.logger.warning("No Ahrefs API key provided. Skipping quality check.")
-            return True
-        
-        # Remove www. if present
-        clean_domain = domain.replace("www.", "")
-        
-        # Exclude subdomains if configured
-        if self.config.get("exclude_subdomains", True):
-            parts = clean_domain.split('.')
-            if len(parts) > 2:
-                self.logger.info(f"Skipping subdomain: {domain}")
-                return False
-                
-        api_url = "https://api.ahrefs.com/v3/site-explorer/overview"
-        
-        headers = {
-            "Authorization": f"Bearer {self.config['ahrefs_api_key']}",
-            "Content-Type": "application/json"
+    """Run a full link building campaign."""
+    start_time = time.time()
+    self.logger.info("Starting high-quality link building campaign")
+    
+    # Load sites data from the dictionary we initialized
+    if not self.sites_data:
+        self.logger.error("No sites data found. Aborting campaign.")
+        return {
+            "quality_sites_found": 0,
+            "submissions_attempted": 0,
+            "successful_submissions": 0,
+            "failed_submissions": 0,
+            "error": "No sites data found"
         }
         
-        params = {
-            "target": clean_domain,
-            "protocol": "both"
-        }
-        
-        try:
-            response = requests.get(api_url, headers=headers, params=params)
-            data = response.json()
+    # Track overall statistics
+    total_quality_sites_found = 0
+    total_submissions_attempted = 0
+    
+    results_by_site_type = {}
+    
+    try:
+        for site_type in self.config["target_site_types"]:
+            self.logger.info(f"Finding {site_type} sites...")
             
-            if response.status_code != 200:
-                error_message = data.get('error', {}).get('message', 'Unknown error')
-                self.logger.error(f"Ahrefs API error: {error_message}")
-                return False
+            try:
+                sites = self.find_submission_sites(site_type, sites_per_type)
                 
-            domain_rating = data.get("metrics", {}).get("domain_rating", 0)
-            organic_traffic = data.get("metrics", {}).get("organic", {}).get("traffic", 0)
-            
-            self.logger.info(f"Domain: {domain}, DR: {domain_rating}, Traffic: {organic_traffic}")
-            
-            # Check if domain meets basic quality criteria
-            if (domain_rating >= self.config["min_domain_rating"] and 
-                organic_traffic >= self.config["min_organic_traffic"]):
+                site_type_results = {
+                    "sites_found": len(sites),
+                    "successful_submissions": 0,
+                    "failed_submissions": 0
+                }
                 
-                # If URL is provided, check external links count
-                if url:
-                    external_links_count = self.check_external_links_count(clean_domain, url)
-                    if external_links_count is None or external_links_count <= self.config["max_external_links"]:
-                        return True
+                total_quality_sites_found += len(sites)
+                self.logger.info(f"Found {len(sites)} quality {site_type} sites meeting criteria")
+                
+                if sites:
+                    self.logger.info(f"Attempting submissions to {len(sites)} {site_type} sites...")
+                    
+                    # Save initial counts
+                    initial_successful = self.successful_submissions
+                    initial_failed = self.failed_submissions
+                    
+                    # Use ThreadPoolExecutor for parallel submissions if configured
+                    if self.config["max_threads"] > 1:
+                        with ThreadPoolExecutor(max_workers=min(self.config["max_threads"], len(sites))) as executor:
+                            results = list(executor.map(lambda url: self.submit_to_site(url, site_type), sites))
+                            total_submissions_attempted += len(results)
                     else:
-                        self.logger.info(f"Too many external links ({external_links_count}) on {url}")
-                        return False
-                else:
-                    return True
-            else:
-                self.logger.info(f"Domain {domain} doesn't meet quality criteria (DR: {domain_rating}, Traffic: {organic_traffic})")
-                return False
+                        # Sequential processing
+                        for url in sites:
+                            self.submit_to_site(url, site_type)
+                            total_submissions_attempted += 1
+                            
+                    # Calculate site-type specific stats
+                    site_type_results["successful_submissions"] = self.successful_submissions - initial_successful
+                    site_type_results["failed_submissions"] = self.failed_submissions - initial_failed
+                    
+                results_by_site_type[site_type] = site_type_results
                 
-        except Exception as e:
-            self.logger.error(f"Error checking site quality for {domain}: {str(e)}")
+            except Exception as e:
+                self.logger.error(f"Error processing site type {site_type}: {str(e)}")
+                traceback.print_exc()  # Print full traceback for debugging
+                results_by_site_type[site_type] = {
+                    "sites_found": 0,
+                    "successful_submissions": 0,
+                    "failed_submissions": 0,
+                    "error": str(e)
+                }
+                
+        # Calculate campaign duration
+        end_time = time.time()
+        duration_seconds = int(end_time - start_time)
+        
+        # Log final statistics
+        self.logger.info(f"Campaign completed in {duration_seconds} seconds.")
+        self.logger.info(f"Quality sites found: {total_quality_sites_found}")
+        self.logger.info(f"Submissions attempted: {total_submissions_attempted}")
+        self.logger.info(f"Successful submissions: {self.successful_submissions}")
+        self.logger.info(f"Failed submissions: {self.failed_submissions}")
+        
+        # Return campaign results
+        return {
+            "quality_sites_found": total_quality_sites_found,
+            "submissions_attempted": total_submissions_attempted,
+            "successful_submissions": self.successful_submissions,
+            "failed_submissions": self.failed_submissions,
+            "duration_seconds": duration_seconds,
+            "results_by_site_type": results_by_site_type
+        }
+        
+    except Exception as e:
+        self.logger.error(f"Error running campaign: {str(e)}")
+        traceback.print_exc()
+        return {
+            "quality_sites_found": total_quality_sites_found,
+            "submissions_attempted": total_submissions_attempted,
+            "successful_submissions": self.successful_submissions,
+            "failed_submissions": self.failed_submissions,
+            "error": str(e)
+        }
+    finally:
+        # Clean up all drivers
+        self.cleanup()
+        
+def find_submission_sites(self, site_type, limit=5):
+    """
+    Find sites for submission based on type and quality criteria.
+    Uses Ahrefs API to find quality sites.
+    """
+    try:
+        self.logger.info(f"Searching for {site_type} sites...")
+        
+        # Define search patterns for different site types
+        search_patterns = {
+            "forums": ["forum", "community", "discussion", "board"],
+            "blogs": ["blog", "article", "post", "news"],
+            "qa_sites": ["questions", "answers", "ask", "q&a"],
+            "directories": ["directory", "list", "catalog", "resources"],
+            "social_bookmarks": ["bookmark", "save", "share", "social"],
+            "wiki_sites": ["wiki", "knowledge", "information", "encyclopedia"],
+            "comment_sections": ["comment", "feedback", "review", "opinion"]
+        }
+        
+        patterns = search_patterns.get(site_type, ["forum", "blog", "questions"])
+        
+        # If we have an Ahrefs API key, use it to find sites
+        if self.config.get("ahrefs_api_key"):
+            # This would be replaced with actual Ahrefs API calls
+            # For now, use mock data
+            found_sites = []
+            
+            for pattern in patterns:
+                # Mock API call
+                domain_rating_min = self.config.get("min_domain_rating", 50)
+                traffic_min = self.config.get("min_organic_traffic", 500)
+                
+                # In a real implementation, call Ahrefs API here
+                
+                # For testing purposes, generate some mock sites
+                mock_sites = [
+                    f"https://{pattern}{i}.example.com" for i in range(1, limit + 1)
+                ]
+                
+                for site in mock_sites:
+                    # Check if site meets quality criteria
+                    domain = urlparse(site).netloc
+                    if self.check_site_quality(domain, site):
+                        found_sites.append(site)
+                        if len(found_sites) >= limit:
+                            break
+            
+            self.logger.info(f"Found {len(found_sites)} quality {site_type} sites")
+            return found_sites[:limit]
+        else:
+            # If no Ahrefs API key, use mock data for testing
+            domains = [f"{pattern}{i}.example.com" for pattern in patterns for i in range(1, 3)]
+            sites = [f"https://{domain}/page" for domain in domains]
+            self.logger.info(f"Using {len(sites)} mock {site_type} sites for testing (no Ahrefs API key)")
+            return sites[:limit]
+            
+    except Exception as e:
+        self.logger.error(f"Error finding {site_type} sites: {str(e)}")
+        # Return empty list on error
+        return []
+        
+def check_site_quality(self, domain, url=None):
+    """
+    Check site quality using Ahrefs API v3.
+    Returns True if the site meets quality criteria, False otherwise.
+    """
+    if not self.config.get("ahrefs_api_key"):
+        self.logger.warning("No Ahrefs API key provided. Skipping quality check.")
+        return True
+    
+    # Remove www. if present
+    clean_domain = domain.replace("www.", "")
+    
+    # Exclude subdomains if configured
+    if self.config.get("exclude_subdomains", True):
+        parts = clean_domain.split('.')
+        if len(parts) > 2:
+            self.logger.info(f"Skipping subdomain: {domain}")
             return False
             
+    api_url = "https://api.ahrefs.com/v3/site-explorer/overview"
+    
+    headers = {
+        "Authorization": f"Bearer {self.config['ahrefs_api_key']}",
+        "Content-Type": "application/json"
+    }
+    
+    params = {
+        "target": clean_domain,
+        "protocol": "both"
+    }
+    
+    try:
+        response = requests.get(api_url, headers=headers, params=params)
+        data = response.json()
+        
+        if response.status_code != 200:
+            error_message = data.get('error', {}).get('message', 'Unknown error')
+            self.logger.error(f"Ahrefs API error: {error_message}")
+            return False
+            
+        domain_rating = data.get("metrics", {}).get("domain_rating", 0)
+        organic_traffic = data.get("metrics", {}).get("organic", {}).get("traffic", 0)
+        
+        self.logger.info(f"Domain: {domain}, DR: {domain_rating}, Traffic: {organic_traffic}")
+        
+        # Check if domain meets basic quality criteria
+        if (domain_rating >= self.config["min_domain_rating"] and 
+            organic_traffic >= self.config["min_organic_traffic"]):
+            
+            # If URL is provided, check external links count
+            if url:
+                external_links_count = self.check_external_links_count(clean_domain, url)
+                if external_links_count is None or external_links_count <= self.config["max_external_links"]:
+                    return True
+                else:
+                    self.logger.info(f"Too many external links ({external_links_count}) on {url}")
+                    return False
+            else:
+                return True
+        else:
+            self.logger.info(f"Domain {domain} doesn't meet quality criteria (DR: {domain_rating}, Traffic: {organic_traffic})")
+            return False
+            
+    except Exception as e:
+        self.logger.error(f"Error checking site quality for {domain}: {str(e)}")
+        return False
+        
 def check_external_links_count(self, domain, url):
-        """
-        Check the number of external links on a specific URL using Ahrefs API v3.
-        Returns the count or None if unavailable.
-        """
-        api_url = "https://api.ahrefs.com/v3/site-explorer/linked-domains-from-page"
+    """
+    Check the number of external links on a specific URL using Ahrefs API v3.
+    Returns the count or None if unavailable.
+    """
+    api_url = "https://api.ahrefs.com/v3/site-explorer/linked-domains-from-page"
+    
+    headers = {
+        "Authorization": f"Bearer {self.config['ahrefs_api_key']}",
+        "Content-Type": "application/json"
+    }
+    
+    params = {
+        "target": url,
+        "protocol": "both",
+        "limit": 1  # We only need the count
+    }
+    
+    try:
+        response = requests.get(api_url, headers=headers, params=params)
+        data = response.json()
         
-        headers = {
-            "Authorization": f"Bearer {self.config['ahrefs_api_key']}",
-            "Content-Type": "application/json"
-        }
-        
-        params = {
-            "target": url,
-            "protocol": "both",
-            "limit": 1  # We only need the count
-        }
-        
-        try:
-            response = requests.get(api_url, headers=headers, params=params)
-            data = response.json()
-            
-            if response.status_code != 200:
-                error_message = data.get('error', {}).get('message', 'Unknown error')
-                self.logger.error(f"Ahrefs API error when checking external links: {error_message}")
-                return None
-                
-            # Get count of external domains linked from this page
-            count = data.get("count", 0)
-            return count
-            
-        except Exception as e:
-            self.logger.error(f"Error checking external links for {url}: {str(e)}")
+        if response.status_code != 200:
+            error_message = data.get('error', {}).get('message', 'Unknown error')
+            self.logger.error(f"Ahrefs API error when checking external links: {error_message}")
             return None
             
+        # Get count of external domains linked from this page
+        count = data.get("count", 0)
+        return count
+        
+    except Exception as e:
+        self.logger.error(f"Error checking external links for {url}: {str(e)}")
+        return None
+        
 def cleanup(self):
-        """Clean up resources."""
-        with self.driver_pool_lock:
-            for thread_id, driver in list(self.driver_pool.items()):
-                try:
-                    driver.quit()
-                    self.logger.info(f"Closed WebDriver for thread {thread_id}")
-                except Exception as e:
-                    self.logger.error(f"Error closing WebDriver for thread {thread_id}: {str(e)}")
-            self.driver_pool.clear()
-            
+    """Clean up resources."""
+    with self.driver_pool_lock:
+        for thread_id, driver in list(self.driver_pool.items()):
+            try:
+                driver.quit()
+                self.logger.info(f"Closed WebDriver for thread {thread_id}")
+            except Exception as e:
+                self.logger.error(f"Error closing WebDriver for thread {thread_id}: {str(e)}")
+        self.driver_pool.clear()
+        
 def __del__(self):
-        """Destructor to ensure cleanup."""
-        self.cleanup()
+    """Destructor to ensure cleanup."""
+    self.cleanup()
 
 
 if __name__ == "__main__":
