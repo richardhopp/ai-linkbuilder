@@ -4,15 +4,26 @@ import logging
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 import uvicorn
 from dotenv import load_dotenv
 import time
 import threading
 
-# Import your link builder class - adjust path as needed
+# Import link builder class
 from high_quality_link_builder import HighQualityLinkBuilder
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler("app.log")
+    ]
+)
+logger = logging.getLogger("app")
 
 # Load environment variables
 load_dotenv()
@@ -35,6 +46,8 @@ app.add_middleware(
 
 # Set up basic authentication
 API_KEY = os.getenv("API_KEY", "your-default-api-key")
+if API_KEY == "your-default-api-key":
+    logger.warning("Using default API key. Consider setting a secure API key using the API_KEY environment variable.")
 
 # Store campaign results
 campaign_results = {}
@@ -57,12 +70,12 @@ class CampaignConfig(BaseModel):
     ahrefs_api_key: str
     openai_api_key: Optional[str] = None
     twocaptcha_api_key: Optional[str] = None
-    min_domain_rating: int = 50
-    min_organic_traffic: int = 500
-    max_external_links: int = 100
+    min_domain_rating: int = Field(50, ge=0, le=100, description="Minimum domain rating (0-100)")
+    min_organic_traffic: int = Field(500, ge=0, description="Minimum organic traffic")
+    max_external_links: int = Field(100, ge=0, description="Maximum external links")
     exclude_subdomains: bool = True
-    max_threads: int = 3
-    sites_per_type: int = 3
+    max_threads: int = Field(3, ge=1, le=10, description="Maximum concurrent threads (1-10)")
+    sites_per_type: int = Field(3, ge=1, le=20, description="Number of sites per type (1-20)")
     target_site_types: List[str] = ["forums", "blogs", "qa_sites", "directories", "social_bookmarks"]
     sites_data: Dict[str, SiteConfig] = {}
 
@@ -70,6 +83,7 @@ class CampaignConfig(BaseModel):
 def run_campaign_task(campaign_id: str, config: CampaignConfig):
     try:
         campaign_status[campaign_id] = "running"
+        logger.info(f"Starting campaign {campaign_id}")
         
         # Create link builder instance
         link_builder = HighQualityLinkBuilder()
@@ -106,13 +120,14 @@ def run_campaign_task(campaign_id: str, config: CampaignConfig):
         # Store results
         campaign_results[campaign_id] = results
         campaign_status[campaign_id] = "completed"
+        logger.info(f"Campaign {campaign_id} completed successfully")
         
         # Cleanup
         link_builder.cleanup()
         del active_campaigns[campaign_id]
         
     except Exception as e:
-        logging.error(f"Campaign error: {str(e)}")
+        logger.error(f"Campaign error: {str(e)}", exc_info=True)
         campaign_status[campaign_id] = f"failed: {str(e)}"
         
         # Cleanup if link builder was created
@@ -120,14 +135,15 @@ def run_campaign_task(campaign_id: str, config: CampaignConfig):
             try:
                 active_campaigns[campaign_id].cleanup()
                 del active_campaigns[campaign_id]
-            except:
-                pass
+            except Exception as cleanup_error:
+                logger.error(f"Error during cleanup: {str(cleanup_error)}", exc_info=True)
 
 # API Endpoints
 @app.post("/campaigns/", status_code=202, dependencies=[Depends(verify_api_key)])
 async def start_campaign(config: CampaignConfig, background_tasks: BackgroundTasks):
     """Start a new link building campaign."""
     campaign_id = f"campaign_{int(time.time())}"
+    logger.info(f"Received request to start campaign {campaign_id}")
     
     # Start campaign in background
     background_tasks.add_task(run_campaign_task, campaign_id, config)
@@ -168,17 +184,34 @@ async def cancel_campaign(campaign_id: str):
             active_campaigns[campaign_id].cleanup()
             del active_campaigns[campaign_id]
             campaign_status[campaign_id] = "cancelled"
+            logger.info(f"Campaign {campaign_id} cancelled")
             return {"campaign_id": campaign_id, "status": "cancelled"}
         except Exception as e:
+            logger.error(f"Error cancelling campaign: {str(e)}", exc_info=True)
             raise HTTPException(status_code=500, detail=f"Error cancelling campaign: {str(e)}")
     else:
         return {"campaign_id": campaign_id, "status": campaign_status[campaign_id]}
+
+@app.get("/health", include_in_schema=False)
+async def health_check():
+    """Health check endpoint"""
+    return {"status": "healthy"}
 
 @app.get("/", include_in_schema=False)
 async def root():
     return {"message": "High-Quality Link Builder API. See /docs for documentation."}
 
+# Error handling
+@app.exception_handler(Exception)
+async def generic_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled exception: {str(exc)}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error. Please try again later."}
+    )
+
 # Run the app if this file is executed directly
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "8000"))
+    logger.info(f"Starting server on port {port}")
     uvicorn.run("app:app", host="0.0.0.0", port=port, reload=False)
