@@ -1109,7 +1109,7 @@ def submit_to_comment_section(self, url):
             self.logger.error(f"Error submitting to comment section {url}: {str(e)}")
             return False
             
-    def submit_to_site(self, url, site_type):
+def submit_to_site(self, url, site_type):
         """Submit to a site based on its type."""
         try:
             # Add random delay to mimic human behavior
