@@ -1162,7 +1162,7 @@ def submit_to_site(self, url, site_type):
             # Always close the driver for this thread when done
             self.close_driver()
             
-    def extract_page_context(self, url, site_type):
+def extract_page_context(self, url, site_type):
         """
         Extract context from a page for content generation.
         Returns a tuple of (context_text, question, topic)
