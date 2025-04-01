@@ -1217,11 +1217,11 @@ def extract_page_context(self, url, site_type):
             self.logger.error(f"Error extracting page topic: {str(e)}")
             return None
             
-    def generate_random_string(self, length=6):
+def generate_random_string(self, length=6):
         """Generate a random string of specified length."""
         return ''.join(random.choices(string.ascii_lowercase + string.digits, k=length))
             
-    def generate_smart_content(self, site_type, target_url, context_text=None, question=None, topic=None):
+def generate_smart_content(self, site_type, target_url, context_text=None, question=None, topic=None):
         """
         Generate relevant content based on target site type and available context.
         Returns tuple of (content, relevant_site)
@@ -1250,7 +1250,7 @@ def extract_page_context(self, url, site_type):
             self.logger.error(f"Error generating smart content: {str(e)}")
             return self.generate_fallback_content(site_type, relevant_site)
             
-    def select_relevant_site(self, topic):
+def select_relevant_site(self, topic):
         """
         Select the most relevant money site based on topic.
         Returns dict with site information.
@@ -1282,7 +1282,7 @@ def extract_page_context(self, url, site_type):
             site_name = random.choice(list(self.sites_data.keys()))
             return {"name": site_name, **self.sites_data[site_name]}
             
-    def generate_ai_content(self, site_type, domain, page_topic, question, context_text, site_info, links_count):
+def generate_ai_content(self, site_type, domain, page_topic, question, context_text, site_info, links_count):
         """Generate content using OpenAI."""
         try:
             prompt_content = ""
@@ -1378,7 +1378,7 @@ def extract_page_context(self, url, site_type):
             self.logger.error(f"Error generating AI content: {str(e)}")
             return self.generate_fallback_content(site_type, site_info)
             
-    def generate_template_content(self, site_type, page_topic, question, site_info, links_count):
+def generate_template_content(self, site_type, page_topic, question, site_info, links_count):
         """Generate content from templates when AI generation is unavailable."""
         try:
             templates = {
@@ -1432,7 +1432,7 @@ def extract_page_context(self, url, site_type):
             self.logger.error(f"Error generating template content: {str(e)}")
             return self.generate_fallback_content(site_type, site_info)
             
-    def generate_fallback_content(self, site_type, site_info):
+def generate_fallback_content(self, site_type, site_info):
         """Generate fallback content when smart content generation fails."""
         try:
             templates = {
@@ -1464,7 +1464,7 @@ def extract_page_context(self, url, site_type):
             # Ultra fallback
             return f"Check out <a href=\"{site_info['url']}\">{site_info['name']}</a> for more information.", site_info
             
-    def run_campaign(self, sites_per_type=5):
+def run_campaign(self, sites_per_type=5):
         """Run a full link building campaign."""
         start_time = time.time()
         self.logger.info("Starting high-quality link building campaign")
@@ -1571,7 +1571,7 @@ def extract_page_context(self, url, site_type):
             # Clean up all drivers
             self.cleanup()
             
-    def find_submission_sites(self, site_type, limit=5):
+def find_submission_sites(self, site_type, limit=5):
         """
         Find sites for submission based on type and quality criteria.
         Uses Ahrefs API to find quality sites.
@@ -1632,7 +1632,7 @@ def extract_page_context(self, url, site_type):
             # Return empty list on error
             return []
             
-    def check_site_quality(self, domain, url=None):
+def check_site_quality(self, domain, url=None):
         """
         Check site quality using Ahrefs API v3.
         Returns True if the site meets quality criteria, False otherwise.
@@ -1699,7 +1699,7 @@ def extract_page_context(self, url, site_type):
             self.logger.error(f"Error checking site quality for {domain}: {str(e)}")
             return False
             
-    def check_external_links_count(self, domain, url):
+def check_external_links_count(self, domain, url):
         """
         Check the number of external links on a specific URL using Ahrefs API v3.
         Returns the count or None if unavailable.
@@ -1734,7 +1734,7 @@ def extract_page_context(self, url, site_type):
             self.logger.error(f"Error checking external links for {url}: {str(e)}")
             return None
             
-    def cleanup(self):
+def cleanup(self):
         """Clean up resources."""
         with self.driver_pool_lock:
             for thread_id, driver in list(self.driver_pool.items()):
@@ -1745,7 +1745,7 @@ def extract_page_context(self, url, site_type):
                     self.logger.error(f"Error closing WebDriver for thread {thread_id}: {str(e)}")
             self.driver_pool.clear()
             
-    def __del__(self):
+def __del__(self):
         """Destructor to ensure cleanup."""
         self.cleanup()
 
