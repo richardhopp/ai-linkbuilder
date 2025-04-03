@@ -10,7 +10,7 @@ import traceback
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlparse, urljoin
 from bs4 import BeautifulSoup
-from openai import OpenAI  # Updated OpenAI import
+import openai
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
@@ -274,7 +274,7 @@ class HighQualityLinkBuilder:
             # Set up OpenAI for advanced content generation
             if self.config.get("openai_api_key"):
                 # Updated OpenAI client initialization
-                self.openai_client = OpenAI(api_key=self.config["openai_api_key"])
+                openai.api_key = self.config["openai_api_key"]
                 self.logger.info("OpenAI client initialized successfully")
             else:
                 self.logger.warning("No OpenAI API key provided. Using basic text generation instead.")
@@ -1241,7 +1241,7 @@ def generate_smart_content(self, site_type, target_url, context_text=None, quest
         )
         
         # Generate content based on site type
-        if hasattr(self, 'openai_client'):
+        if openai.api_key:
             return self.generate_ai_content(site_type, domain, page_topic, question, context_text, relevant_site, links_count)
         else:
             return self.generate_template_content(site_type, page_topic, question, relevant_site, links_count)
@@ -1334,7 +1334,7 @@ def generate_ai_content(self, site_type, domain, page_topic, question, context_t
             prompt_content += f"\n\nContext from the page: \"{context_sample}\""
             
         # Generate content with OpenAI - updated for new client
-        response = self.openai_client.chat.completions.create(
+        response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[
                 {"role": "system", "content": "You are an expert in real estate, travel, and expatriate living. Write helpful, natural-sounding content that subtly incorporates links without appearing promotional. The links should feel like genuine resources rather than advertisements."},
