@@ -1028,7 +1028,7 @@ class HighQualityLinkBuilder:
         except Exception as e:
             self.logger.error(f"Error submitting to social bookmark {url}: {str(e)}")
             return False
-def submit_to_comment_section(self, url):
+    def submit_to_comment_section(self, url):
         """Submit to a generic comment section."""
         driver = None
         try:
